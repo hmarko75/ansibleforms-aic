@@ -1,0 +1,8 @@
+{
+    "cluster": "cluster1.demo.netapp.com",
+    "ansiblehost": "192.168.0.4",
+    "sourcesvm": "svm1",
+    "targetsvm": "svm2",
+    "voltype": "flexgroup",
+    "aggregate": "cluster1_01_SSD_1"
+}

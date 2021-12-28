@@ -1,0 +1,188 @@
+categories:
+  - name: Default
+    icon: bars
+  - name: Dataset
+    icon: bath
+  - name: Create
+    icon: bath  
+  - name: Clone
+    icon: bath             
+roles:
+  - name: admin
+    groups:
+      - local/admins
+      - ldap/Domain Admins
+  - name: operator
+    groups:
+      - local/operator
+  - name: demo
+    groups:
+      - local/demo
+  - name: public
+    groups: []
+  - name: DataOps
+    groups:
+      - local/DataOps Admins  
+forms:
+  - name: Create new dataset 
+    help: |
+      This is used to create new dataset in the FZ-DEV. The new dataset will be mounted under /data/{aud,eng,nlp,vis}/datasets  
+    roles:
+      - DataOps
+    description: New dataset creation 
+    categories:
+      - Dataset
+      - Create
+    #tileClass: has-background-link
+    icon: scroll
+    playbook: dataops_create_vol.yaml
+    inventory: hosts
+    type: ansible
+    fields:   
+      - type: expression
+        hide: true
+        label: globals
+        name: globals
+        expression: "fn.fnReadJsonFile('/app/dist/persistent/global.json','')"           
+      #- type: expression
+      #  name: existingvols
+      #  label: existingvols
+      #  expression: fn.fnRestBasic('get','https://$(cluster)/api/storage/volumes?order_by=name&svm.name=$(svm)&fields=name','','ONTAP','.records | map(.name) | "^(?!.*" + join (")(?!.*")+ ").*$"') 
+      #set the vol type as flexgroup or flexvol        
+      - type: enum
+        name: department
+        label: Depratment
+        default: aud
+        values:
+        - aud
+        - eng
+        - nlp
+        - vis
+        required: true
+      - type: text
+        name: dataset_name
+        label: Dataset Name
+        default: ""
+        required: true
+        minLength: 3
+        maxLength: 20
+        #regex: $(existingvols)
+        #regex: ^(?!.*app1)(?!.*app2)(?!.*svm1_root)(?!.*user_dans)(?!.*user_gracel)(?!.*user_hmarko)(?!.*user_janes)(?!.*user_kateh)(?!.*user_koko)(?!.*user_marium)(?!.*user_oved)(?!.*user_stanw)(?!.*user_stever)(?!.*user_tzafrir)(?!.*user_user)(?!.*user_userkk)(?!.*user_userko)(?!.*user_useruuu)(?!.*vol1).*$
+        #regexDescription: Dataset already exists 
+        regex: ^[a-zA-Z0-9_]*$
+        regexDescription: Invalid dataset name
+      #will be used to create the volume name (department_projectname)
+      - type: expression
+        hide: true
+        label: volname
+        name: volname
+        expression: "'$(department)'+'_'+'$(dataset_name)'"          
+      #will be used to create the junction path on the globalname space)
+      - type: expression
+        hide: true
+        label: junction_path
+        name: junction_path
+        expression: "'/data/'+'$(department)'+'/datasets/'+'$(dataset_name)'"  
+      - type: enum
+        name: volsize
+        label: Dataset Initial Size
+        default: 2TB
+        required: true
+        values:
+        - 100GB
+        - 200GB
+        - 300GB
+        - 400GB
+        - 500GB
+        - 600GB
+        - 700GB
+        - 800GB
+        - 900GB
+        - 1TB
+        - 2TB
+        - 3TB
+        - 4TB
+        - 5TB
+        - 10TB
+        - 20TB
+        - 50TB
+        size: 4
+        help: Select the size of the volume. The volume will be created thin provisioned and can be resized in later phase. 
+
+  - name: Clone dataset from FZ-DEV to SZ 
+    help: |
+      This is used to clone dataset in the FZ-DEV. The new dataset will be mounted under /data/{aud,eng,nlp,vis}/datasets on the SZ 
+    roles:
+      - DataOps
+    description: Clone dataset
+    categories:
+      - Dataset
+      - Clone
+    #tileClass: has-background-link
+    icon: scroll
+    playbook: dataops_clone_vol.yaml
+    inventory: hosts
+    type: ansible
+    fields:   
+      #load global parameters 
+      - type: expression
+        hide: true
+        label: globals
+        name: globals
+        expression: "fn.fnReadJsonFile('/app/dist/persistent/global.json','')"                 
+      - type: enum
+        name: department
+        label: Depratment
+        default: aud
+        values:
+        - aud
+        - eng
+        - nlp
+        - vis
+        required: true
+      - type: query
+        name: dataset
+        expression: fn.fnRestBasic('get','https://'+'cluster1.demo.netapp.com'+'/api/storage/volumes?svm.name=svm1&state=online&nas.path=/data/$(department)/datasets/*&name=$(department)_*&fields=nas.path&style=flexgroup,flexvol','','ONTAP','[(.records[] | ({Volume:.name} + {uuid} + {Path:.nas.path} + {Dataset:.nas.path | sub("^/data/$(department)/datasets/"; "")}))]','','')
+        label: Source Dataset
+        default: __auto__
+        multiple: false
+        outputObject: true
+        columns:
+        - Dataset
+        - Volume
+        - Path    
+      - type: query
+        name: parent_snapshot
+        expression: fn.fnRestBasic('get','https://'+'cluster1.demo.netapp.com'+'/api/storage/volumes/$(dataset.uuid)/snapshots?fields=name,create_time','','ONTAP','[(.records[] | ({Snapshot:.name} + {"Create Time":.create_time} ) ) ]','','')
+        label: Parent Snapshot
+        default: __auto__
+        multiple: false
+        outputObject: true
+        columns:
+        - Snapshot
+        - "Create Time"
+      - type: text
+        name: clone_dataset
+        label: Optional Clone Dataset Name
+        placeholder: optional dataset name, if not provided source name will be used
+        required: false
+        minLength: 1
+        maxLength: 20
+        regex: ^[a-zA-Z0-9_]*$
+        regexDescription: Invalid dataset name 
+        default: ""
+      - type: expression
+        hide: true
+        label: targetvolume
+        name: targetvolume
+        expression: "'$(clone_dataset)'=='' ? '$(dataset.Volume)' : '$(department)'+'_'+'$(clone_dataset)'"       
+      - type: expression
+        hide: true
+        label: new_dataset
+        name: new_dataset
+        expression: "'$(clone_dataset)'=='' ? '$(dataset.Volume)' : '$(clone_dataset)'"            
+      - type: expression
+        hide: true
+        label: junction_path
+        name: junction_path
+        expression: "'/data/'+'$(department)'+'/datasets/'+'$(new_dataset)'"  
