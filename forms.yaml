@@ -281,3 +281,81 @@ forms:
         required: true
         icon: flag
         help: when retention is bigger than 0, retention count of snapshots will be kept and snapshots will be suffixed by timestamp
+
+  - name: Delete dataset clone 
+    help: |
+      This is used to permanently delete dataset and all its data.
+      This can only be done if this dataset have no clones  
+    roles:
+      - DataOps
+    description: Delete dataset
+    categories:
+      - Dataset
+      - Delete
+    tileClass: has-background-danger	
+    icon: scroll
+    playbook: dataops_delete_vol.yaml
+    inventory: hosts
+    type: ansible
+    fields:   
+      #load global parameters 
+      - type: expression
+        hide: true
+        label: globals
+        name: globals
+        expression: "fn.fnReadJsonFile('/app/dist/persistent/global.json','')"                 
+      - type: expression
+        runLocal: true
+        hide: true
+        label: cluster
+        name: cluster
+        expression: "JSON.parse('$(globals)').cluster"            
+      - type: enum
+        name: department
+        label: Depratment
+        default: aud
+        values:
+        - aud
+        - eng
+        - nlp
+        - vis
+        required: true
+      - type: query
+        name: svm
+        expression: fn.fnRestBasic('get','https://$(cluster)/api/svm/svms?name=svm*&fields=name','','ONTAP','[.records[]]','','')
+        label: SVM
+        default: __auto__
+        multiple: false
+        outputObject: true
+        columns:
+        - name              
+      - type: query
+        name: dataset
+        expression: fn.fnRestBasic('get','https://$(cluster)/api/storage/volumes?svm.name=$(svm.name)&state=online&nas.path=/data/$(department)/datasets/*&name=$(department)_*&fields=nas.path,clone.is_flexclone,clone.parent_svm.name,clone.parent_volume.name','','ONTAP','[(.records[] | ({Volume:.name} + {uuid} + {Path:.nas.path} + {FlexClone:.clone.is_flexclone} + {Dataset:.nas.path | sub("^/data/$(department)/datasets/"; "")}))]','','')
+        label: Source Dataset
+        default: __auto__
+        multiple: false
+        outputObject: true
+        columns:
+        - Dataset
+        - Volume
+        - Path    
+        - FlexClone
+      - type: checkbox
+        name: areyousure
+        label: Confirmation
+        default: false
+        placeholder: Are you sure you want to delete the dataset (important data can be lost) ?
+      - type: text
+        name: confirmation
+        label: Please type YES to confirm you want to delete
+        placeholder: "YES" 
+        required: true
+        minLength: 1
+        maxLength: 3
+        regex: ^YES$
+        regexDescription: Type YES to confirm
+        dependencies:         # add a list of dependencies
+        - name: areyousure # reference field it depends on
+          values:             # values of the reference field that are valid
+          - true
