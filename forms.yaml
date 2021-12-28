@@ -130,6 +130,18 @@ forms:
         label: globals
         name: globals
         expression: "fn.fnReadJsonFile('/app/dist/persistent/global.json','')"                 
+      - type: expression
+        runLocal: true
+        hide: true
+        label: cluster
+        name: cluster
+        expression: "JSON.parse('$(globals)').cluster"
+      - type: expression
+        runLocal: true
+        hide: true
+        label: sourcesvm
+        name: sourcesvm
+        expression: "JSON.parse('$(globals)').sourcesvm"                
       - type: enum
         name: department
         label: Depratment
@@ -142,7 +154,7 @@ forms:
         required: true
       - type: query
         name: dataset
-        expression: fn.fnRestBasic('get','https://'+'cluster1.demo.netapp.com'+'/api/storage/volumes?svm.name=svm1&state=online&nas.path=/data/$(department)/datasets/*&name=$(department)_*&fields=nas.path&style=flexgroup,flexvol','','ONTAP','[(.records[] | ({Volume:.name} + {uuid} + {Path:.nas.path} + {Dataset:.nas.path | sub("^/data/$(department)/datasets/"; "")}))]','','')
+        expression: fn.fnRestBasic('get','https://$(cluster)/api/storage/volumes?svm.name=$(sourcesvm)&state=online&nas.path=/data/$(department)/datasets/*&name=$(department)_*&fields=nas.path&style=flexgroup,flexvol','','ONTAP','[(.records[] | ({Volume:.name} + {uuid} + {Path:.nas.path} + {Dataset:.nas.path | sub("^/data/$(department)/datasets/"; "")}))]','','')
         label: Source Dataset
         default: __auto__
         multiple: false
@@ -153,7 +165,7 @@ forms:
         - Path    
       - type: query
         name: parent_snapshot
-        expression: fn.fnRestBasic('get','https://'+'cluster1.demo.netapp.com'+'/api/storage/volumes/$(dataset.uuid)/snapshots?fields=name,create_time','','ONTAP','[(.records[] | ({Snapshot:.name} + {"Create Time":.create_time} ) ) ]','','')
+        expression: fn.fnRestBasic('get','https://$(cluster)/api/storage/volumes/$(dataset.uuid)/snapshots?fields=name,create_time','','ONTAP','[(.records[] | ({Snapshot:.name} + {"Create Time":.create_time} ) ) ]','','')
         label: Parent Snapshot
         default: __auto__
         multiple: false
@@ -186,3 +198,86 @@ forms:
         label: junction_path
         name: junction_path
         expression: "'/data/'+'$(department)'+'/datasets/'+'$(new_dataset)'"  
+  - name: Create snapshot
+    help: |
+      This is used to create snapshot for dataset  
+    roles:
+      - DataOps
+    description: create snapshot on existing dataset
+    categories:
+      - Snapshot
+      - Create
+    #tileClass: has-background-link
+    icon: scroll
+    playbook: dataops_create_snapshot.yaml
+    inventory: hosts
+    type: ansible
+    fields:   
+      #load global parameters 
+      - type: expression
+        hide: true
+        label: globals
+        name: globals
+        expression: fn.fnReadJsonFile('/app/dist/persistent/global.json','')                
+      - type: expression
+        runLocal: true
+        hide: true
+        label: cluster
+        name: cluster
+        expression: "JSON.parse('$(globals)').cluster"     
+      - type: enum
+        name: department
+        label: Depratment
+        default: aud
+        values:
+        - aud
+        - eng
+        - nlp
+        - vis
+        required: true
+      - type: query
+        name: svm
+        expression: fn.fnRestBasic('get','https://$(cluster)/api/svm/svms?name=svm*&fields=name','','ONTAP','[.records[]]','','')
+        label: SVM
+        default: __auto__
+        multiple: false
+        outputObject: true
+        columns:
+        - name          
+      - type: query
+        name: dataset
+        expression: fn.fnRestBasic('get','https://$(cluster)/api/storage/volumes?svm.name=$(svm.name)&state=online&nas.path=/data/$(department)/datasets/*&name=$(department)_*&fields=nas.path&style=flexgroup,flexvol','','ONTAP','[(.records[] | ({Volume:.name} + {uuid} + {Path:.nas.path} + {Dataset:.nas.path | sub("^/data/$(department)/datasets/"; "")}))]','','')
+        label: Dataset
+        default: __auto__
+        multiple: false
+        outputObject: true
+        columns:
+        - Dataset
+        - Volume
+        - Path    
+      - type: text
+        name: snapshot
+        label: Snapshot Name
+        placeholder: manual snapshot name 
+        required: true
+        minLength: 1
+        maxLength: 20
+        regex: ^[a-zA-Z0-9_]*$
+        regexDescription: Invalid snapshot name 
+      - type: enum
+        name: retention
+        label: Retention Count
+        default: "0"
+        values:
+        - "0"
+        - "1"
+        - "2"
+        - "3"
+        - "4"
+        - "5"
+        - "10"
+        multiple: false
+        size: 4
+        required: true
+        icon: flag
+        help: when retention is bigger than 0, retention count of snapshots will be kept and snapshots will be suffixed by timestamp
