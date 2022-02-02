@@ -188,16 +188,19 @@ forms:
         label: targetvolume
         name: targetvolume
         expression: "'$(clone_dataset)'=='' ? '$(dataset.Volume)' : '$(department)'+'_'+'$(clone_dataset)'"       
+        runLocal: true
       - type: expression
         hide: true
         label: new_dataset
         name: new_dataset
         expression: "'$(clone_dataset)'=='' ? '$(dataset.Volume)' : '$(clone_dataset)'"            
+        runLocal: true
       - type: expression
         hide: true
         label: junction_path
         name: junction_path
         expression: "'/data/'+'$(department)'+'/datasets/'+'$(new_dataset)'"  
+        runLocal: true
   - name: Create snapshot
     help: |
       This is used to create snapshot for dataset  
