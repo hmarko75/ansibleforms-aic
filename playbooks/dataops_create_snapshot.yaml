@@ -2,6 +2,7 @@
 - name: create snapshot
   hosts: "{{ globals.ansiblehost }}"
   become: no 
+  runLocal: true
   tasks:
   - name: This command will create snapshot on svm:"{{ svm.name }}" volume:"{{ dataset.Volume }}" snapshot:"{{ snapshot }} retention:"{{ retention }}"
     command: /usr/local/bin/netapp_dataops_cli.py create snapshot --svm={{ svm.name }} --volume={{ dataset.Volume }} --name={{ snapshot }} --retention={{ retention }}
