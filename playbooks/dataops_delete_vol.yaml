@@ -2,6 +2,7 @@
 - name: delete dataset
   hosts: "{{ globals.ansiblehost }}"
   become: no 
+  runLocal: true
   tasks:
   - name: This command will delete svm:"{{ svm.name }}" volume:"{{ dataset.Volume }}"
     command: /usr/local/bin/netapp_dataops_cli.py delete volume --name="{{ dataset.Volume }}" --svm="{{ svm.name }}" --force
